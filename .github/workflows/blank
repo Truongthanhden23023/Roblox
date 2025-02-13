@@ -1,0 +1,48 @@
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+
+local frame = script.Parent  -- Frame chứa GUI
+local textBox = frame.TextBox  -- Kết nối TextBox
+local buyButton = frame.BuyButton  -- Kết nối Button "Mua"
+local closeButton = frame.CloseButton  -- Kết nối nút "X"
+local isVisible = true  -- Ban đầu GUI hiện
+local isRunning = false  -- Kiểm soát vòng lặp
+
+-- Hàm ẩn/hiện GUI khi nhấn nút "X"
+closeButton.MouseButton1Click:Connect(function()
+    isVisible = not isVisible
+    frame.Visible = isVisible
+end)
+
+-- Kiểm tra xem UGC có đang bán không
+local function checkUGC(itemID)
+    local url = "https://economy.roblox.com/v1/assets/" .. itemID .. "/resellers"
+    local success, response = pcall(function()
+        return HttpService:GetAsync(url)
+    end)
+
+    if success then
+        local data = HttpService:JSONDecode(response)
+        if data and data.data and #data.data > 0 then
+            return true  -- UGC đang bán
+        end
+    end
+    return false  -- Chưa có ai bán
+end
+
+-- Tự động mua UGC
+local function autoBuyUGC(itemID)
+    local success, err = pcall(function()
+        MarketplaceService:PromptPurchase(game.Players.LocalPlayer, tonumber(itemID))
+    end)
+    
+    if success then
+        print("✅ Đã mua UGC:", itemID)
+    else
+        print("❌ Lỗi mua hàng:", err)
+    end
+end
+
+-- Khi nhấn nút "Mua"
+buyButton.MouseButton1Click:Connect(function
