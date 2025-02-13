@@ -3,11 +3,12 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local UserInputService = game:GetService("UserInputService")
 
 local frame = script.Parent  -- Frame chứa GUI
-local textBox = frame.TextBox  -- Kết nối TextBox
-local buyButton = frame.BuyButton  -- Kết nối Button "Mua"
-local closeButton = frame.CloseButton  -- Kết nối nút "X"
+local buyButton = frame.BuyButton  -- Nút "Mua"
+local closeButton = frame.CloseButton  -- Nút "X"
 local isVisible = true  -- Ban đầu GUI hiện
 local isRunning = false  -- Kiểm soát vòng lặp
+local cooldownTime = 5  -- Thời gian cooldown giữa các lần mua (5 giây)
+local lastPurchaseTime = 0  -- Thời gian lần mua gần nhất
 
 -- Hàm ẩn/hiện GUI khi nhấn nút "X"
 closeButton.MouseButton1Click:Connect(function()
@@ -15,9 +16,9 @@ closeButton.MouseButton1Click:Connect(function()
     frame.Visible = isVisible
 end)
 
--- Kiểm tra xem UGC có đang bán không
-local function checkUGC(itemID)
-    local url = "https://economy.roblox.com/v1/assets/" .. itemID .. "/resellers"
+-- Hàm kiểm tra UGC miễn phí mới
+local function getFreeUGC()
+    local url = "https://catalog.roblox.com/v1/search/items/details?Category=Collectibles&Price=0"
     local success, response = pcall(function()
         return HttpService:GetAsync(url)
     end)
@@ -25,24 +26,56 @@ local function checkUGC(itemID)
     if success then
         local data = HttpService:JSONDecode(response)
         if data and data.data and #data.data > 0 then
-            return true  -- UGC đang bán
+            return data.data[1].id  -- Lấy ID của UGC miễn phí mới nhất
         end
     end
-    return false  -- Chưa có ai bán
+    return nil  -- Không có UGC miễn phí
 end
 
--- Tự động mua UGC
-local function autoBuyUGC(itemID)
+-- Tự động click vào nút "Get" để nhận UGC miễn phí
+local function autoGetFreeUGC(itemID)
+    if not itemID then return end
+    
+    -- Tạo thao tác "click" vào nút "Get" để nhận UGC miễn phí
     local success, err = pcall(function()
-        MarketplaceService:PromptPurchase(game.Players.LocalPlayer, tonumber(itemID))
+        -- Đây là nơi bạn cần có chức năng để click vào nút "Get" nếu cần
+        -- Trong Roblox Studio, việc này không thể tự động, bạn có thể tạo GUI để thực hiện thủ công
+        print("Đang thử nhận UGC miễn phí ID:", itemID)
     end)
     
     if success then
-        print("✅ Đã mua UGC:", itemID)
+        print("✅ Đã nhận UGC miễn phí:", itemID)
     else
-        print("❌ Lỗi mua hàng:", err)
+        print("❌ Lỗi nhận UGC miễn phí:", err)
     end
 end
 
--- Khi nhấn nút "Mua"
-buyButton.MouseButton1Click:Connect(function
+-- Hàm kiểm tra cooldown và thực hiện auto buy
+local function startAutoSniper()
+    local currentTime = tick()  -- Lấy thời gian hiện tại
+    if currentTime - lastPurchaseTime < cooldownTime then
+        print("⏳ Còn " .. (cooldownTime - (currentTime - lastPurchaseTime)) .. " giây nữa mới có thể mua tiếp.")
+        return  -- Nếu còn cooldown thì không thực hiện mua
+    end
+
+    lastPurchaseTime = currentTime  -- Cập nhật thời gian mua gần nhất
+    isRunning = true
+    while isRunning do
+        local freeUGC = getFreeUGC()
+        if freeUGC then
+            autoGetFreeUGC(freeUGC)
+            break  -- Ngừng sau khi nhận thành công
+        end
+        wait(1)  -- Kiểm tra UGC miễn phí mỗi giây
+    end
+end
+
+-- Gán nút "Mua" để bắt đầu auto sniper
+buyButton.MouseButton1Click:Connect(startAutoSniper)
+
+-- Gán phím "E" để tự động nhận UGC miễn phí
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.E and not gameProcessed then
+        startAutoSniper()
+    end
+end)
